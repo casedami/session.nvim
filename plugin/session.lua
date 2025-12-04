@@ -1,9 +1,7 @@
 vim.api.nvim_create_user_command("Session", function(opts)
 	local api = require("session.api")
 	local subcmd = opts.fargs[1]
-	local args = table.remove(opts.fargs, 1)
-	print(subcmd)
-	print(args[1])
+	table.remove(opts.fargs, 1)
 
 	local cmds = {
 		default = api.list,
@@ -15,5 +13,5 @@ vim.api.nvim_create_user_command("Session", function(opts)
 	}
 
 	local cmd = subcmd ~= nil and cmds[subcmd] or cmds.default
-	cmd(args)
+	cmd(unpack(opts.fargs))
 end, { nargs = "*" })

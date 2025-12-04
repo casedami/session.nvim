@@ -39,30 +39,28 @@ end
 ---## Examples
 ---
 ---`:Session delete id main` delete session with id 'main' in session directory
----`:Session delete dir branch` delete all sessions with branch prefix in session directory
----`:Session delete dir user` delete all sessions with user prefix in session directory
+---`:Session delete prefix branch` delete all sessions with branch prefix in session directory
+---`:Session delete prefix user` delete all sessions with user prefix in session directory
 ---`:Session delete dir` delete all sessions in session directory
 ---`:Session delete all` delete all sessions
 ---@param scope string?
----@param name string?
-M.try_delete = function(scope, name)
+---@param arg1 string?
+M.try_delete = function(scope, arg1)
 	local Path = require("session.path")
 	local valid = {
-		id = name and string.format("%s/*-%s.vim", Path.locdir.dir, name) or false,
-		dir = {
-			prefix = name and string.format("%s/%s-*.vim", Path.locdir.dir, Path.prefix[name]) or false,
-			all = Path.locdir.dir,
-		},
+		id = arg1 and string.format("%s/*-%s.vim", Path.locdir.dir, arg1) or false,
+		dir = Path.locdir.dir,
+		prefix = arg1 and string.format("%s/%s-*.vim", Path.locdir.dir, Path.prefix[arg1]) or false,
 		all = vim.g.sessions_dir,
 		default = Path.path(),
 	}
 
-	local cmd = valid[scope]
-	if cmd == false then
+	local to_delete = valid[scope]
+	if to_delete == false then
 		Notify.invalid(scope)
 		return
 	end
-	local to_delete = cmd or valid.default
+	to_delete = to_delete or valid.default
 	local out = vim.system({ "rm", "-r", to_delete })
 	if out.code == 0 then
 		Notify.deleted(to_delete)
