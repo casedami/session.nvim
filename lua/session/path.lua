@@ -1,6 +1,6 @@
 vim.g.session_id_fallback = "local"
 local M = {
-	Prefix = { user = "lo", branch = "br" },
+	Prefix = { user = "lo", branch = "br", default = "*", all = "*" },
 }
 
 ---@alias LocalizedDir { is_repo: boolean, hash: string, dir: string }
@@ -54,6 +54,7 @@ end
 ---@param user_id string?
 ---@return string
 local function session_fname(user_id)
+	-- BUG: assumes any passed ID is user-prefixed
 	local prefix = user_id and M.Prefix.user or M.locdir.is_repo and M.Prefix.branch or M.Prefix.user
 	local id = user_id or (M.locdir.is_repo and git_branch() or nil) or vim.g.session_id_fallback
 	return string.format("%s-%s.vim", prefix, id)
@@ -83,7 +84,8 @@ end
 ---@param on_ids fun(ids: table): nil
 M.ids = function(prefix, on_ids)
 	local pattern = string.format("%s-*.vim", prefix)
-	local sessions = vim.fn.globpath(as_path(vim.g.sessions_dir, M.locdir.hash), pattern, false, true)
+	local path = as_path(vim.g.sessions_dir, M.locdir.hash)
+	local sessions = vim.fn.globpath(path, pattern, false, true)
 
 	if #sessions == 0 then
 		vim.notify(string.format("No sessions found for directory: '%s'", M.locdir.dir), vim.log.levels.INFO)

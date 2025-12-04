@@ -71,17 +71,11 @@ end
 
 ---Prints out all sessions in the session directory, with an optional prefix
 ---filter.
----@param prefix string?
-M.list = function(prefix)
-	local valid = {
-		default = "",
-		br = "branch",
-		lo = "local",
-	}
-	local pre = valid[prefix] or valid.default
-
+---@param p string?
+M.list = function(p)
 	local Path = require("session.path")
-	Path.ids(pre, function(ids)
+	local prefix = Path.Prefix[p] or Path.Prefix.default
+	Path.ids(prefix, function(ids)
 		if #ids > 0 then
 			print(table.concat(ids, "\n"))
 		else
@@ -110,8 +104,7 @@ end
 ---sourced.
 M.select = function()
 	local Path = require("session.path")
-	local all_prefixes = ""
-	Path.ids(all_prefixes, function(ids)
+	Path.ids(Path.Prefix.all, function(ids)
 		if #ids == 1 then
 			M.try_source(ids[1])
 		else
