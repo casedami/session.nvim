@@ -101,7 +101,7 @@ end
 M.save = function(user_id)
 	local Path = require("session.path")
 	local p = Path.path(user_id)
-	vim.system({ "mkdir", "-p", vim.fn.dirname(p) }):wait()
+	vim.system({ "mkdir", "-p", vim.fs.dirname(p) }):wait()
 	vim.cmd(string.format("mksession! %s", p))
 	Notify.saved(user_id)
 end
