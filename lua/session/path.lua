@@ -1,44 +1,61 @@
 vim.g.session_id_fallback = "local"
-local M = {
-	Prefix = { user = "lo", branch = "br", default = "*", all = "*" },
-}
 
 ---@alias LocalizedDir { is_repo: boolean, hash: string, dir: string }
+---@alias SessionPath { path: string, prefix: string, id: string, context: LocalizedDir }
+---@alias PrefixSpec { user: string, branch: string, default: string, all: string }
+
+local M = {
+    ---@type PrefixSpec
+    prefixes = { user = "lo", branch = "br", default = "*", all = "*" },
+}
 
 ---Returns the localized directory for the session.
 ---@return LocalizedDir
 local function session_dir()
-	local repo = vim.fs.root(0, ".git")
-	local is_repo = repo ~= nil and true or false
-	local dir = repo or vim.fn.getcwd()
-	local hash = vim.fn.sha256(dir):sub(1, 8)
-	return { is_repo = is_repo, hash = hash, dir = dir }
+    local repo = vim.fs.root(0, ".git")
+    local is_repo = repo ~= nil and true or false
+    local dir = repo or vim.fn.getcwd()
+    local hash = vim.fn.sha256(dir):sub(1, 8)
+    return { is_repo = is_repo, hash = hash, dir = dir }
 end
 
 ---@type LocalizedDir
-M.locdir = session_dir()
+M.context = session_dir()
 
 ---Formats parameters as a '/' separated string.
 ---@param ... any
 ---@return string
 local function as_path(...)
-	return table.concat({ ... }, "/")
+    return table.concat({ ... }, "/")
 end
 
 ---Returns the git branch, if available.
 ---Note: assumes git command won't fail.
 ---@return string?
 local git_branch = function()
-	local out = vim.system({ "git", "branch", "--show-current" }, { text = true }):wait()
-	if out.code ~= 0 then
-		return nil
-	end
+    local out = vim.system(
+        { "git", "branch", "--show-current" },
+        { text = true }
+    )
+        :wait()
+    if out.code ~= 0 then
+        return nil
+    end
 
-	local branch = vim.trim(out.stdout):gsub("/", "_")
-	return #branch > 0 and branch or nil
+    local branch = vim.trim(out.stdout):gsub("/", "_")
+    return #branch > 0 and branch or nil
 end
 
----Builds and returns the session name.
+---Builds and returns the full session path.
+---
+---The session path has three components:
+--- * The global session directory
+--- * The localized hash
+--- * The session name
+---
+---The localized hash is determined by the following priority:
+--- 1. Git project root
+--- 2. Current working directory (vim)
 ---
 ---The session name has two components:
 --- * The session prefix
@@ -52,29 +69,22 @@ end
 --- 2. Git branch
 --- 3. Fallback ID
 ---@param user_id string?
----@return string
-local function session_fname(user_id)
-	-- BUG: assumes any passed ID is user-prefixed
-	local prefix = user_id and M.Prefix.user or M.locdir.is_repo and M.Prefix.branch or M.Prefix.user
-	local id = user_id or (M.locdir.is_repo and git_branch() or nil) or vim.g.session_id_fallback
-	return string.format("%s-%s.vim", prefix, id)
-end
-
----Builds and returns the full session path.
----
----The session path has three components:
---- * The global session directory
---- * The localized hash
---- * The session name
----
----The localized hash is determined by the following priority:
---- 1. Git project root
---- 2. Current working directory (vim)
----@param user_id string?
----@return string
+---@return SessionPath
 M.path = function(user_id)
-	local session = session_fname(user_id)
-	return as_path(vim.g.sessions_dir, M.locdir.hash, session)
+    local prefix = user_id and M.prefixes.user
+        or M.context.is_repo and M.prefixes.branch
+        or M.prefixes.user
+    local id = user_id
+        or (M.context.is_repo and git_branch() or nil)
+        or vim.g.session_id_fallback
+    local session = string.format("%s-%s.vim", prefix, id)
+
+    local spath = {
+        full = as_path(vim.g.sessions_dir, M.context.hash, session),
+        prefix = prefix,
+        id = id,
+    }
+    return spath
 end
 
 ---Returns all the session IDs in the session directory with a given prefix.
@@ -83,21 +93,27 @@ end
 ---@param prefix string
 ---@param on_ids fun(ids: table): nil
 M.ids = function(prefix, on_ids)
-	local pattern = string.format("%s-*.vim", prefix)
-	local path = as_path(vim.g.sessions_dir, M.locdir.hash)
-	local sessions = vim.fn.globpath(path, pattern, false, true)
+    local pattern = string.format("%s-*.vim", prefix)
+    local path = as_path(vim.g.sessions_dir, M.context.hash)
+    local sessions = vim.fn.globpath(path, pattern, false, true)
 
-	if #sessions == 0 then
-		vim.notify(string.format("No sessions found for directory: '%s'", M.locdir.dir), vim.log.levels.INFO)
-		return
-	end
+    if #sessions == 0 then
+        vim.notify(
+            string.format(
+                "No sessions found for directory: '%s'",
+                M.context.dir
+            ),
+            vim.log.levels.INFO
+        )
+        return
+    end
 
-	local ids = {}
-	for _, s in ipairs(sessions) do
-		ids[#ids + 1] = s:match("%-(.+)%.vim")
-	end
-	table.sort(ids)
-	on_ids(ids)
+    local ids = {}
+    for _, s in ipairs(sessions) do
+        ids[#ids + 1] = s:match("%-(.+)%.vim")
+    end
+    table.sort(ids)
+    on_ids(ids)
 end
 
 return M

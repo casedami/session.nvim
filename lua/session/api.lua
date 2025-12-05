@@ -3,27 +3,33 @@ vim.g.sessions_dir = vim.env.HOME .. "/.local/sessions"
 
 local Notify = {}
 Notify.unknown = function(id)
-	vim.notify(string.format("Unknown session: '%s'", id), vim.log.levels.INFO)
+    vim.notify(string.format("Unknown session: '%s'", id), vim.log.levels.INFO)
 end
 
 Notify.saved = function(id)
-	vim.notify(string.format("Saved session: '%s'", id), vim.log.levels.INFO)
+    vim.notify(string.format("Saved session: '%s'", id), vim.log.levels.INFO)
 end
 
 Notify.deleted = function(id)
-	vim.notify(string.format("Deleted session: '%s'", id), vim.log.levels.INFO)
+    vim.notify(string.format("Deleted session: '%s'", id), vim.log.levels.INFO)
 end
 
 Notify.deleted_count = function(n)
-	vim.notify(string.format("Deleted %n sessions'", n), vim.log.levels.INFO)
+    vim.notify(string.format("Deleted %n sessions'", n), vim.log.levels.INFO)
 end
 
 Notify.none = function()
-	vim.notify("No sessions for current project/directory", vim.log.levels.INFO)
+    vim.notify(
+        "No sessions for current project/directory",
+        vim.log.levels.INFO
+    )
 end
 
 Notify.invalid = function(subcmd)
-	vim.notify(string.format("Must specify argument for subcommand: %s", subcmd), vim.log.levels.INFO)
+    vim.notify(
+        string.format("Must specify argument for subcommand: %s", subcmd),
+        vim.log.levels.INFO
+    )
 end
 
 ---Attempts to delete a session file/directory.
@@ -44,44 +50,49 @@ end
 ---`:Session delete dir` delete all sessions in session directory
 ---`:Session delete all` delete all sessions
 ---@param scope string?
----@param arg1 string?
-M.try_delete = function(scope, arg1)
-	local Path = require("session.path")
-	local valid = {
-		id = arg1 and string.format("%s/*-%s.vim", Path.locdir.dir, arg1) or false,
-		dir = Path.locdir.dir,
-		prefix = arg1 and string.format("%s/%s-*.vim", Path.locdir.dir, Path.prefix[arg1]) or false,
-		all = vim.g.sessions_dir,
-		default = Path.path(),
-	}
+---@param target string?
+M.try_delete = function(scope, target)
+    local Path = require("session.path")
+    local valid = {
+        id = target and string.format("%s/*-%s.vim", Path.context.dir, target)
+            or false,
+        dir = Path.context.dir,
+        prefix = target and string.format(
+            "%s/%s-*.vim",
+            Path.context.dir,
+            Path.prefixes[target]
+        ) or false,
+        all = vim.g.sessions_dir,
+        default = Path.path(),
+    }
 
-	local to_delete = valid[scope]
-	if to_delete == false then
-		Notify.invalid(scope)
-		return
-	end
-	to_delete = to_delete or valid.default
-	local out = vim.system({ "rm", "-r", to_delete })
-	if out.code == 0 then
-		Notify.deleted(to_delete)
-	else
-		Notify.unknown(to_delete)
-	end
+    local to_delete = valid[scope]
+    if to_delete == false then
+        Notify.invalid(scope)
+        return
+    end
+    to_delete = to_delete or valid.default
+    local out = vim.system({ "rm", "-r", to_delete })
+    if out.code == 0 then
+        Notify.deleted(to_delete)
+    else
+        Notify.unknown(to_delete)
+    end
 end
 
 ---Prints out all sessions in the session directory, with an optional prefix
 ---filter.
 ---@param p string?
 M.list = function(p)
-	local Path = require("session.path")
-	local prefix = Path.Prefix[p] or Path.Prefix.default
-	Path.ids(prefix, function(ids)
-		if #ids > 0 then
-			print(table.concat(ids, "\n"))
-		else
-			Notify.none()
-		end
-	end)
+    local Path = require("session.path")
+    local prefix = Path.prefixes[p] or Path.prefixes.default
+    Path.ids(prefix, function(ids)
+        if #ids > 0 then
+            print(table.concat(ids, "\n"))
+        else
+            Notify.none()
+        end
+    end)
 end
 
 ---Creates a session with an optional user ID.
@@ -91,11 +102,12 @@ end
 ---used.
 ---@param user_id string?
 M.save = function(user_id)
-	local Path = require("session.path")
-	local p = Path.path(user_id)
-	vim.system({ "mkdir", "-p", vim.fs.dirname(p) }):wait()
-	vim.cmd(string.format("mksession! %s", p))
-	Notify.saved(user_id)
+    local Path = require("session.path")
+    ---@type SessionPath
+    local p = Path.path(user_id)
+    vim.system({ "mkdir", "-p", vim.fs.dirname(p.full) }):wait()
+    vim.cmd(string.format("mksession! %s", p.full))
+    Notify.saved(p.id)
 end
 
 ---Opens a selection window to choose a session to source.
@@ -103,29 +115,34 @@ end
 ---Note, if there is only one session available, then it is automatically
 ---sourced.
 M.select = function()
-	local Path = require("session.path")
-	Path.ids(Path.Prefix.all, function(ids)
-		if #ids == 1 then
-			M.try_source(ids[1])
-		else
-			vim.ui.select(ids, { prompt = "Choose session:" }, function(choice_id)
-				M.try_source(choice_id)
-			end)
-		end
-	end)
+    local Path = require("session.path")
+    Path.ids(Path.prefixes.all, function(ids)
+        if #ids == 1 then
+            M.try_source(ids[1])
+        else
+            vim.ui.select(
+                ids,
+                { prompt = "Choose session:" },
+                function(choice_id)
+                    M.try_source(choice_id)
+                end
+            )
+        end
+    end)
 end
 
 ---Attempts to source a session (if it exists) with an optional ID.
 ---@param id string?
 M.try_source = function(id)
-	local Path = require("session.path")
-	local p = Path.path(id)
-	local session_exists = vim.uv.fs_stat(p) ~= nil
-	if session_exists then
-		vim.cmd(string.format("source %s", p))
-	else
-		Notify.unknown(id)
-	end
+    local Path = require("session.path")
+    ---@type SessionPath
+    local p = Path.path(id)
+    local session_exists = vim.uv.fs_stat(p.full) ~= nil
+    if session_exists then
+        vim.cmd(string.format("source %s", p.full))
+    else
+        Notify.unknown(id)
+    end
 end
 
 ---Syncs the session directory with the git repository.
@@ -133,22 +150,23 @@ end
 ---If there are any sessions associated with branches that have intermittently
 ---been deleted, then those sessions are deleted.
 M.sync = function()
-	local branches = vim.fn.systemlist("git branch --format='%(refname:short)'")
-	local live_branches = {}
-	for _, b in ipairs(branches) do
-		live_branches[b] = true
-	end
-	local Path = require("session.path")
-	Path.ids(Path.prefix.branch, function(ids)
-		local deleted = 0
-		for _, branch in ipairs(ids) do
-			if not M.exclude_ids[branch] and live_branches[branch] == nil then
-				M.try_delete(branch)
-				deleted = deleted + 1
-			end
-		end
-		Notify.deleted_count(deleted)
-	end)
+    local branches =
+        vim.fn.systemlist("git branch --format='%(refname:short)'")
+    local live_branches = {}
+    for _, b in ipairs(branches) do
+        live_branches[b] = true
+    end
+    local Path = require("session.path")
+    Path.ids(Path.prefixes.branch, function(ids)
+        local deleted = 0
+        for _, branch in ipairs(ids) do
+            if not M.exclude_ids[branch] and live_branches[branch] == nil then
+                M.try_delete(branch)
+                deleted = deleted + 1
+            end
+        end
+        Notify.deleted_count(deleted)
+    end)
 end
 
 return M
