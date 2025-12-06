@@ -135,14 +135,23 @@ end
 ---@param id string?
 M.try_source = function(id)
     local Path = require("session.path")
-    ---@type SessionPath
-    local p = Path.path(id)
-    local session_exists = vim.uv.fs_stat(p.full) ~= nil
-    if session_exists then
-        vim.cmd(string.format("source %s", p.full))
+
+    local to_source
+    if id ~= nil then
+        local search_dir = Path.as_path(vim.g.sessions_dir, Path.context.hash)
+        local pattern = string.format("*%s.vim", id)
+        local matches = vim.fn.globpath(search_dir, pattern, false, true)
+
+        if #matches > 0 then
+            to_source = matches[1]
+        else
+            Notify.unknown(id)
+            return
+        end
     else
-        Notify.unknown(id)
+        to_source = Path.path().full
     end
+    vim.cmd(string.format("source %s", to_source))
 end
 
 ---Syncs the session directory with the git repository.
