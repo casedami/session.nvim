@@ -50,17 +50,17 @@ end
 ---`:Session delete dir` delete all sessions in session directory
 ---`:Session delete all` delete all sessions
 ---@param scope string?
----@param arg1 string?
-M.try_delete = function(scope, arg1)
+---@param target string?
+M.try_delete = function(scope, target)
     local Path = require("session.path")
     local valid = {
-        id = arg1 and string.format("%s/*-%s.vim", Path.locdir.hash, arg1)
+        id = target and string.format("%s/*-%s.vim", Path.context.dir, target)
             or false,
-        dir = string.format("%s/%s", vim.g.sessions_dir, Path.locdir.hash),
-        prefix = arg1 and string.format(
+        dir = Path.context.dir,
+        prefix = target and string.format(
             "%s/%s-*.vim",
-            Path.locdir.hash,
-            Path.prefix[arg1]
+            Path.context.dir,
+            Path.prefixes[target]
         ) or false,
         all = vim.g.sessions_dir,
         default = Path.path(),
