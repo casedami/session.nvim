@@ -50,17 +50,17 @@ end
 ---`:Session delete dir` delete all sessions in session directory
 ---`:Session delete all` delete all sessions
 ---@param scope string?
----@param target string?
-M.try_delete = function(scope, target)
+---@param arg1 string?
+M.try_delete = function(scope, arg1)
     local Path = require("session.path")
     local valid = {
-        id = target and string.format("%s/*-%s.vim", Path.context.dir, target)
+        id = arg1 and string.format("%s/*-%s.vim", Path.locdir.hash, arg1)
             or false,
-        dir = Path.context.dir,
-        prefix = target and string.format(
+        dir = string.format("%s/%s", vim.g.sessions_dir, Path.locdir.hash),
+        prefix = arg1 and string.format(
             "%s/%s-*.vim",
-            Path.context.dir,
-            Path.prefixes[target]
+            Path.locdir.hash,
+            Path.prefix[arg1]
         ) or false,
         all = vim.g.sessions_dir,
         default = Path.path(),
@@ -71,13 +71,9 @@ M.try_delete = function(scope, target)
         Notify.invalid(scope)
         return
     end
-    to_delete = to_delete or valid.default
-    local out = vim.system({ "rm", "-r", to_delete })
-    if out.code == 0 then
-        Notify.deleted(to_delete)
-    else
-        Notify.unknown(to_delete)
-    end
+    to_delete = to_delete or valid.default.path
+    vim.fs.rm(to_delete, { recursive = true })
+    Notify.deleted(to_delete)
 end
 
 ---Prints out all sessions in the session directory, with an optional prefix
@@ -105,8 +101,8 @@ M.save = function(user_id)
     local Path = require("session.path")
     ---@type SessionPath
     local p = Path.path(user_id)
-    vim.system({ "mkdir", "-p", vim.fs.dirname(p.full) }):wait()
-    vim.cmd(string.format("mksession! %s", p.full))
+    vim.system({ "mkdir", "-p", vim.fs.dirname(p.path) }):wait()
+    vim.cmd(string.format("mksession! %s", p.path))
     Notify.saved(p.id)
 end
 
@@ -114,9 +110,9 @@ end
 ---
 ---Note, if there is only one session available, then it is automatically
 ---sourced.
-M.select = function()
+M.choose = function()
     local Path = require("session.path")
-    Path.ids(Path.prefixes.all, function(ids)
+    Path.ids(Path.Prefix.all, function(ids)
         if #ids == 1 then
             M.try_source(ids[1])
         else
@@ -124,7 +120,9 @@ M.select = function()
                 ids,
                 { prompt = "Choose session:" },
                 function(choice_id)
-                    M.try_source(choice_id)
+                    if choice_id ~= nil then
+                        M.try_source(choice_id)
+                    end
                 end
             )
         end
@@ -135,23 +133,14 @@ end
 ---@param id string?
 M.try_source = function(id)
     local Path = require("session.path")
-
-    local to_source
-    if id ~= nil then
-        local search_dir = Path.as_path(vim.g.sessions_dir, Path.context.hash)
-        local pattern = string.format("*%s.vim", id)
-        local matches = vim.fn.globpath(search_dir, pattern, false, true)
-
-        if #matches > 0 then
-            to_source = matches[1]
-        else
-            Notify.unknown(id)
-            return
-        end
+    ---@type SessionPath
+    local p = Path.path(id)
+    local session_exists = vim.uv.fs_stat(p.path) ~= nil
+    if session_exists then
+        vim.cmd(string.format("source %s", p.path))
     else
-        to_source = Path.path().full
+        Notify.unknown(id)
     end
-    vim.cmd(string.format("source %s", to_source))
 end
 
 ---Syncs the session directory with the git repository.

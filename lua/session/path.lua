@@ -1,7 +1,7 @@
 vim.g.session_id_fallback = "local"
 
 ---@alias LocalizedDir { is_repo: boolean, hash: string, dir: string }
----@alias SessionPath { full: string, prefix: string, id: string, context: LocalizedDir }
+---@alias SessionPath { path: string, prefix: string, id: string, context: LocalizedDir }
 ---@alias PrefixSpec { user: string, branch: string, default: string, all: string }
 
 local M = {
@@ -21,6 +21,13 @@ end
 
 ---@type LocalizedDir
 M.context = session_dir()
+
+---Formats parameters as a '/' separated string.
+---@param ... any
+---@return string
+local function as_path(...)
+    return table.concat({ ... }, "/")
+end
 
 ---Returns the git branch, if available.
 ---Note: assumes git command won't fail.
@@ -80,7 +87,7 @@ M.path = function(user_id)
     local session = string.format("%s-%s.vim", prefix, id)
 
     local spath = {
-        full = M.as_path(vim.g.sessions_dir, M.context.hash, session),
+        full = as_path(vim.g.sessions_dir, M.context.hash, session),
         prefix = prefix,
         id = id,
     }
@@ -94,7 +101,7 @@ end
 ---@param on_ids fun(ids: table): nil
 M.ids = function(prefix, on_ids)
     local pattern = string.format("%s-*.vim", prefix)
-    local path = M.as_path(vim.g.sessions_dir, M.context.hash)
+    local path = as_path(vim.g.sessions_dir, M.context.hash)
     local sessions = vim.fn.globpath(path, pattern, false, true)
 
     if #sessions == 0 then

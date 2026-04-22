@@ -5,10 +5,15 @@ vim.api.nvim_create_user_command("Session", function(opts)
 
 	local cmds = {
 		default = api.list,
+		d = api.try_delete,
 		delete = api.try_delete,
+		l = api.list,
 		list = api.list,
+		s = api.save,
 		save = api.save,
-		select = api.select,
+		c = api.select,
+		choose = api.select,
+		x = api.try_source,
 		source = api.try_source,
 	}
 
