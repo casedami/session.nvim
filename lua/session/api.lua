@@ -1,5 +1,5 @@
 local M = {}
-vim.g.sessions_dir = vim.env.HOME .. "/.local/sessions"
+vim.g.sessions_dir = vim.env.HOME .. "/.local/share/nvim/sessions"
 
 local Notify = {}
 Notify.unknown = function(id)
