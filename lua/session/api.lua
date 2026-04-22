@@ -50,17 +50,17 @@ end
 ---`:Session delete dir` delete all sessions in session directory
 ---`:Session delete all` delete all sessions
 ---@param scope string?
----@param target string?
-M.try_delete = function(scope, target)
+---@param arg1 string?
+M.try_delete = function(scope, arg1)
     local Path = require("session.path")
     local valid = {
-        id = target and string.format("%s/*-%s.vim", Path.context.dir, target)
+        id = arg1 and string.format("%s/*-%s.vim", Path.locdir.hash, arg1)
             or false,
-        dir = Path.context.dir,
-        prefix = target and string.format(
+        dir = string.format("%s/%s", vim.g.sessions_dir, Path.locdir.hash),
+        prefix = arg1 and string.format(
             "%s/%s-*.vim",
-            Path.context.dir,
-            Path.prefixes[target]
+            Path.locdir.hash,
+            Path.prefix[arg1]
         ) or false,
         all = vim.g.sessions_dir,
         default = Path.path(),
@@ -114,9 +114,9 @@ end
 ---
 ---Note, if there is only one session available, then it is automatically
 ---sourced.
-M.select = function()
+M.choose = function()
     local Path = require("session.path")
-    Path.ids(Path.prefixes.all, function(ids)
+    Path.ids(Path.Prefix.all, function(ids)
         if #ids == 1 then
             M.try_source(ids[1])
         else
@@ -124,7 +124,9 @@ M.select = function()
                 ids,
                 { prompt = "Choose session:" },
                 function(choice_id)
-                    M.try_source(choice_id)
+                    if choice_id ~= nil then
+                        M.try_source(choice_id)
+                    end
                 end
             )
         end
